@@ -1,10 +1,11 @@
-import { SquarePen, SendHorizontal } from "lucide-react";
-import React from "react";
+import { SquarePen, SendHorizontal } from 'lucide-react';
+import React from 'react';
+import ReactMarkdown from 'react-markdown';
 
-function Sidebar({ setChatId, oldChats }) {
+function Sidebar({ setChatId, oldChats, clearOldChats }) {
   return (
-    <div className="h-full bg-white/90 rounded-[10px] backdrop-blur p-6 flex flex-col w-[20%] justify-between">
-      <div className="flex flex-col gap-4">
+    <div className="h-full bg-white/80 rounded-[10px] backdrop-blur p-6 flex flex-col w-[20%] justify-between">
+      <div className="flex flex-col gap-6">
         <div
           onClick={() => setChatId(null)}
           className="flex items-center justify-between hover:bg-primary/50 bg-primary px-4 py-2 rounded-[6px] transition-colors cursor-pointer"
@@ -15,12 +16,18 @@ function Sidebar({ setChatId, oldChats }) {
           </div>
           <SquarePen size={20} />
         </div>
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <p className="font-medium">Old Chats</p>
+            <div className="cursor-pointer" onClick={clearOldChats}>
+              clear
+            </div>
+          </div>
           {oldChats.map(({ title, chatId }) => (
             <div
               onClick={() => setChatId(chatId)}
               key={chatId}
-              className="flex items-center gap-4 rounded-[6px] transition-all cursor-pointer"
+              className="flex items-center gap-4 rounded-[6px] transition-all cursor-pointer bg-gray-100 p-4 hover:bg-primary/50 transition-colors"
             >
               <p className="font-medium">{title}</p>
             </div>
@@ -45,7 +52,7 @@ function NewChat() {
       <img src="/logo-01.png" className="w-48 h-48" />
       <div className="flex flex-col items-center gap-2">
         <p className="text-5xl font-medium">
-          Hi kiddo! I am your kiddy chatbot
+          Hi kiddo! I am your friend Kiddy.
         </p>
         <p className="text-xl">Do you want to ask me about something today?</p>
       </div>
@@ -71,34 +78,57 @@ function ReceivedMessage({ key, message }) {
         <img src="/logo-01.png" className="w-10 h-10 rounded-full" />
         <p className="text font-medium">Kiddy</p>
       </div>
-      <div className="rounded-lg bg-primary p-4">{message}</div>
+      <div className="rounded-lg bg-primary p-4">
+        <ReactMarkdown
+          components={{
+            a: ({ node, ...props }) => (
+              <a
+                {...props}
+                className="text-blue-500 underline"
+                target="_blank"
+              />
+            ),
+          }}
+        >
+          {message}
+        </ReactMarkdown>
+      </div>
     </div>
   );
 }
 
 function ChatHistory({ messages, chatId }) {
+  const messagesEndRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
+
   return (
     <div className="flex flex-col items-center h-full gap-8 py-10 overflow-y-auto">
       {messages[chatId].map(({ role, content }, index) =>
-        role === "user" ? (
+        role === 'user' ? (
           <SentMessage key={index} message={content} />
         ) : (
           <ReceivedMessage key={index} message={content} />
         )
       )}
+      <div ref={messagesEndRef} />
     </div>
   );
 }
 
 function Chat({ chatId, setChatId, oldChats, setOldChats }) {
   const [messages, setMessages] = React.useState({});
-  const [prompt, setPrompt] = React.useState("");
+  const [prompt, setPrompt] = React.useState('');
   const [loading, setLoading] = React.useState(false);
 
   React.useEffect(() => {
     console.log(chatId);
     console.log(messages);
-    if (chatId) {
+    if (chatId && !messages[chatId]) {
       const fetchChatHistory = async () => {
         const res = await fetch(
           `https://72d1-41-43-198-237.ngrok-free.app/chat/${chatId}`
@@ -111,17 +141,16 @@ function Chat({ chatId, setChatId, oldChats, setOldChats }) {
     }
   }, [chatId]);
 
-  async function handleSendMessage(e) {
-    e.preventDefault();
-
+  async function handleSendMessage() {
+    if (!prompt) return;
     setLoading(true);
 
     let currentChatId;
     if (!chatId) {
       const res = await fetch(
-        "https://72d1-41-43-198-237.ngrok-free.app/create_chat",
+        'https://72d1-41-43-198-237.ngrok-free.app/create_chat',
         {
-          method: "GET",
+          method: 'GET',
         }
       );
       const data = await res.json();
@@ -133,13 +162,13 @@ function Chat({ chatId, setChatId, oldChats, setOldChats }) {
         { title: prompt, chatId: data.newChat._id },
       ];
       setOldChats(newChatHistory);
-      localStorage.setItem("oldChats", JSON.stringify(newChatHistory));
+      localStorage.setItem('oldChats', JSON.stringify(newChatHistory));
       setMessages((prevMessage) => {
         return {
           ...prevMessage,
           [currentChatId]: [
-            { role: "user", content: prompt },
-            { role: "assistnant", content: "Let me think 🤔💭..." },
+            { role: 'user', content: prompt },
+            { role: 'assistnant', content: 'Let me think 🤔💭...' },
           ],
         };
       });
@@ -150,8 +179,8 @@ function Chat({ chatId, setChatId, oldChats, setOldChats }) {
           ...prevMessage,
           [currentChatId]: [
             ...prevMessage[currentChatId],
-            { role: "user", content: prompt },
-            { role: "assistnant", content: "Let me think 🤔💭..." },
+            { role: 'user', content: prompt },
+            { role: 'assistnant', content: 'Let me think 🤔💭...' },
           ],
         };
       });
@@ -159,18 +188,19 @@ function Chat({ chatId, setChatId, oldChats, setOldChats }) {
 
     console.log(messages);
     const res = await fetch(
-      "https://72d1-41-43-198-237.ngrok-free.app/send_message",
+      'https://72d1-41-43-198-237.ngrok-free.app/send_message',
       {
-        method: "POST",
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({ chatId: currentChatId, message: prompt }),
       }
     );
+    setPrompt('');
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
-    let fullMessage = "";
+    let fullMessage = '';
 
     while (true) {
       const { done, value } = await reader.read();
@@ -200,10 +230,17 @@ function Chat({ chatId, setChatId, oldChats, setOldChats }) {
     }
   }
 
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault(); // Prevent the default form submission behavior
+      handleSendMessage(); // Call your form submission handler
+    }
+  };
+
   return (
     <div className="h-full bg-white/90 rounded-[10px] backdrop-blur flex flex-col w-[80%] justify-between">
       <div className="px-12 py-6 border-b items-center flex text-2xl font-medium ">
-        Kiddy Chatbot
+        Chat With Kiddy
       </div>
       {!messages[chatId] ? (
         <NewChat />
@@ -211,13 +248,14 @@ function Chat({ chatId, setChatId, oldChats, setOldChats }) {
         <ChatHistory messages={messages} chatId={chatId} />
       )}
       <div className="pb-16 flex flex-col gap-4">
-        <form onSubmit={handleSendMessage} className="flex justify-center">
+        <div className="flex justify-center">
           <textarea
             disabled={loading}
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             type="text"
-            placeholder="Hey there! How about writing a fun message to our friendly kiddy chatbot? You can tell it about your favorite toy..."
+            placeholder="Hey there! Ask me anything..."
+            onKeyDown={handleKeyDown}
             className="p-4 w-[60%] rounded-y-[10px] group border-r-none rounded-l-[10px] border-y border-l focus:outline-none focus:border-primary focus:ring-primary resize-none transition-all"
           />
           <button
@@ -227,7 +265,7 @@ function Chat({ chatId, setChatId, oldChats, setOldChats }) {
           >
             <SendHorizontal />
           </button>
-        </form>
+        </div>
         <p className="flex justify-center text-xs">
           © 2023 Kiddy chatbot, all rights reserved.
         </p>
@@ -242,17 +280,26 @@ function App() {
 
   // get old chatIDs from localStorage
   React.useEffect(() => {
-    const oldChatsHistory = JSON.parse(localStorage.getItem("oldChats")) || [];
+    const oldChatsHistory = JSON.parse(localStorage.getItem('oldChats')) || [];
     if (oldChatsHistory.length === 0) {
-      localStorage.setItem("oldChats", JSON.stringify([]));
+      localStorage.setItem('oldChats', JSON.stringify([]));
     }
     setOldChats(oldChatsHistory);
   }, []);
 
+  function clearOldChats() {
+    localStorage.setItem('oldChats', JSON.stringify([]));
+    setOldChats([]);
+  }
+
   return (
     <div className="flex h-screen w-full bg-[url('/bbg-01.png')]">
       <div className="flex p-6 w-full gap-6">
-        <Sidebar setChatId={setChatId} oldChats={oldChats} />
+        <Sidebar
+          setChatId={setChatId}
+          oldChats={oldChats}
+          clearOldChats={clearOldChats}
+        />
         <Chat
           chatId={chatId}
           setChatId={setChatId}
