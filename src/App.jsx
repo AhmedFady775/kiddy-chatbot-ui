@@ -1,6 +1,8 @@
-import { SquarePen, SendHorizontal } from 'lucide-react';
-import React from 'react';
-import ReactMarkdown from 'react-markdown';
+import { SquarePen, SendHorizontal } from "lucide-react";
+import React from "react";
+import ReactMarkdown from "react-markdown";
+import Loading from "./components/Loading";
+import Modal from "./components/Modal";
 
 function Sidebar({ setChatId, oldChats, clearOldChats }) {
   return (
@@ -27,7 +29,7 @@ function Sidebar({ setChatId, oldChats, clearOldChats }) {
             <div
               onClick={() => setChatId(chatId)}
               key={chatId}
-              className="flex items-center gap-4 rounded-[6px] transition-all cursor-pointer bg-gray-100 p-4 hover:bg-primary/50 transition-colors"
+              className="flex items-center gap-4 rounded-[6px] cursor-pointer bg-gray-100 p-4 hover:bg-primary/50 transition-colors"
             >
               <p className="font-medium">{title}</p>
             </div>
@@ -38,7 +40,7 @@ function Sidebar({ setChatId, oldChats, clearOldChats }) {
       <div className="flex items-center gap-4 rounded-[6px] transition-all cursor-pointer">
         <img src="/avatar.png" className="w-12 h-12" />
         <div>
-          <p className="font-medium">Ahmed Fady</p>
+          <p className="font-medium">{localStorage.getItem("username")}</p>
           <p className="text-sm">User</p>
         </div>
       </div>
@@ -102,14 +104,14 @@ function ChatHistory({ messages, chatId }) {
 
   React.useEffect(() => {
     if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages]);
 
   return (
     <div className="flex flex-col items-center h-full gap-8 py-10 overflow-y-auto">
       {messages[chatId].map(({ role, content }, index) =>
-        role === 'user' ? (
+        role === "user" ? (
           <SentMessage key={index} message={content} />
         ) : (
           <ReceivedMessage key={index} message={content} />
@@ -122,7 +124,7 @@ function ChatHistory({ messages, chatId }) {
 
 function Chat({ chatId, setChatId, oldChats, setOldChats }) {
   const [messages, setMessages] = React.useState({});
-  const [prompt, setPrompt] = React.useState('');
+  const [prompt, setPrompt] = React.useState("");
   const [loading, setLoading] = React.useState(false);
 
   React.useEffect(() => {
@@ -130,9 +132,7 @@ function Chat({ chatId, setChatId, oldChats, setOldChats }) {
     console.log(messages);
     if (chatId && !messages[chatId]) {
       const fetchChatHistory = async () => {
-        const res = await fetch(
-          `https://72d1-41-43-198-237.ngrok-free.app/chat/${chatId}`
-        );
+        const res = await fetch(`http://localhost:8080/chat/${chatId}`);
         const data = await res.json();
         console.log(data);
         setMessages({ ...messages, [chatId]: data.chat });
@@ -147,12 +147,9 @@ function Chat({ chatId, setChatId, oldChats, setOldChats }) {
 
     let currentChatId;
     if (!chatId) {
-      const res = await fetch(
-        'https://72d1-41-43-198-237.ngrok-free.app/create_chat',
-        {
-          method: 'GET',
-        }
-      );
+      const res = await fetch("http://localhost:8080/create_chat", {
+        method: "GET",
+      });
       const data = await res.json();
       setChatId(data.newChat._id);
       currentChatId = data.newChat._id;
@@ -162,16 +159,17 @@ function Chat({ chatId, setChatId, oldChats, setOldChats }) {
         { title: prompt, chatId: data.newChat._id },
       ];
       setOldChats(newChatHistory);
-      localStorage.setItem('oldChats', JSON.stringify(newChatHistory));
+      localStorage.setItem("oldChats", JSON.stringify(newChatHistory));
       setMessages((prevMessage) => {
         return {
           ...prevMessage,
           [currentChatId]: [
-            { role: 'user', content: prompt },
-            { role: 'assistnant', content: 'Let me think 🤔💭...' },
+            { role: "user", content: prompt },
+            { role: "assistnant", content: "Let me think 🤔💭..." },
           ],
         };
       });
+      setPrompt("");
     } else {
       currentChatId = chatId;
       setMessages((prevMessage) => {
@@ -179,35 +177,35 @@ function Chat({ chatId, setChatId, oldChats, setOldChats }) {
           ...prevMessage,
           [currentChatId]: [
             ...prevMessage[currentChatId],
-            { role: 'user', content: prompt },
-            { role: 'assistnant', content: 'Let me think 🤔💭...' },
+            { role: "user", content: prompt },
+            { role: "assistnant", content: "Let me think 🤔💭..." },
           ],
         };
       });
+      setPrompt("");
     }
 
     console.log(messages);
-    const res = await fetch(
-      'https://72d1-41-43-198-237.ngrok-free.app/send_message',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ chatId: currentChatId, message: prompt }),
-      }
-    );
-    setPrompt('');
+    const res = await fetch("http://localhost:8080/send_message", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        chatId: currentChatId,
+        message: prompt,
+        kidName: localStorage.getItem("username"),
+      }),
+    });
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
-    let fullMessage = '';
+    let fullMessage = "";
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
 
       const chunckdata = decoder.decode(value, { stream: true });
-      console.log(chunckdata);
       try {
         const chunkJson = JSON.parse(chunckdata);
 
@@ -223,6 +221,7 @@ function Chat({ chatId, setChatId, oldChats, setOldChats }) {
           });
         } else {
           setLoading(false);
+          console.log(chunkJson);
         }
       } catch (error) {
         console.log(error);
@@ -231,7 +230,7 @@ function Chat({ chatId, setChatId, oldChats, setOldChats }) {
   }
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault(); // Prevent the default form submission behavior
       handleSendMessage(); // Call your form submission handler
     }
@@ -256,18 +255,18 @@ function Chat({ chatId, setChatId, oldChats, setOldChats }) {
             type="text"
             placeholder="Hey there! Ask me anything..."
             onKeyDown={handleKeyDown}
-            className="p-4 w-[60%] rounded-y-[10px] group border-r-none rounded-l-[10px] border-y border-l focus:outline-none focus:border-primary focus:ring-primary resize-none transition-all"
+            className="p-4 w-[60%] rounded-y-[10px]  border-r-none rounded-l-[10px] border-y border-l focus:outline-none focus:border-primary focus:ring-primary resize-none transition-all"
           />
           <button
             disabled={loading}
             onClick={handleSendMessage}
-            className="p-4 flex items-center justify-center bg-white rounded-r-[10px] border-y border-r group-border-primary hover:text-[#66c5c9] transition-all"
+            className="p-4 flex items-center justify-center bg-white rounded-r-[10px] border-y border-r  hover:text-[#66c5c9] transition-all"
           >
             <SendHorizontal />
           </button>
         </div>
         <p className="flex justify-center text-xs">
-          © 2023 Kiddy chatbot, all rights reserved.
+          © 2024 Chat With Kiddy, all rights reserved.
         </p>
       </div>
     </div>
@@ -277,23 +276,34 @@ function Chat({ chatId, setChatId, oldChats, setOldChats }) {
 function App() {
   const [chatId, setChatId] = React.useState(null);
   const [oldChats, setOldChats] = React.useState([]);
+  const [open, setOpen] = React.useState(false);
 
   // get old chatIDs from localStorage
   React.useEffect(() => {
-    const oldChatsHistory = JSON.parse(localStorage.getItem('oldChats')) || [];
+    const oldChatsHistory = JSON.parse(localStorage.getItem("oldChats")) || [];
     if (oldChatsHistory.length === 0) {
-      localStorage.setItem('oldChats', JSON.stringify([]));
+      localStorage.setItem("oldChats", JSON.stringify([]));
     }
     setOldChats(oldChatsHistory);
   }, []);
 
+  React.useEffect(() => {
+    if (!localStorage.getItem("username")) {
+      setTimeout(() => {
+        setOpen(true);
+      }, 2500);
+    }
+  }, []);
+
   function clearOldChats() {
-    localStorage.setItem('oldChats', JSON.stringify([]));
+    localStorage.setItem("oldChats", JSON.stringify([]));
     setOldChats([]);
   }
 
   return (
     <div className="flex h-screen w-full bg-[url('/bbg-01.png')]">
+      <Loading />
+      <Modal open={open} close={() => setOpen(false)} />
       <div className="flex p-6 w-full gap-6">
         <Sidebar
           setChatId={setChatId}
